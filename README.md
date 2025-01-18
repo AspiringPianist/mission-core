@@ -3,7 +3,7 @@ Curated Learning Resources for GenAI. Get started with the basics - build AI sof
 
 # Setup
 ## Python Setup
-First create a new python virtual environment and activate it. During the creation of this repository and code, python 3.11.5 was used, but anything above 3.11+ should work fine.
+First create a new python virtual environment and activate it. During the creation of this repository and code, python 3.11.5 was used, but anything above 3.11+ should work fine.  
 
 ```bash
 python -m venv env
@@ -12,12 +12,14 @@ python -m venv env
 ./env/Scripts/activate
 ```
 
-Now install all the requirements with
+Now install all the requirements with  
+
 ```bash
 pip install -r requirements.txt
 ```
 
-Start jupyter notebook in the root folder of this repository using: 
+Start jupyter notebook in the root folder of this repository using  
+  
 ```bash
 jupyter notebook
 ```
