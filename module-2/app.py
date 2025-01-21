@@ -1,6 +1,5 @@
 import streamlit as st
 from html_generator import BlogGenerator
-import tempfile
 import base64
 import PyPDF2
 from io import BytesIO

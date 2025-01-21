@@ -1,3 +1,4 @@
+################################################# IMPORTS #################################################################################
 from bs4 import BeautifulSoup
 from langchain_community.vectorstores import Chroma
 from langchain_huggingface import HuggingFaceEmbeddings
@@ -6,6 +7,7 @@ from langchain.text_splitter import RecursiveCharacterTextSplitter
 import base64, requests, os, time
 from pydantic import BaseModel, Field
 from typing import List
+################################################# Pydantic Models for Structured Output ####################################################
 
 class BlogTitles(BaseModel):
     titles: List[str] = Field(description="List of 4 section titles for the blog", max_items=4, min_items=4)
@@ -17,8 +19,16 @@ class Section(BaseModel):
     title: str = Field(description="Section title")
     content: str = Field(description="Section content")
 
+################################################# Blog Generator Class #################################################################################
+
 class BlogGenerator:
     def __init__(self, template_path="index.html"):
+        """
+        Initialize ChatGroq as we have seen earlier via langchain_groq,
+        Use Embeddings for HuggingFace just like before,
+        Use Beautiful Soup to parse the HTML file so we can access it by HTML syntax
+        Initialize the HuggingFace API Endpoint for calling Stable Diffusion for Image Generation
+        """
         self.llm = ChatGroq(
             api_key="GROQ_API_KEY",
             model="llama-3.3-70b-specdec"
@@ -36,23 +46,37 @@ class BlogGenerator:
         self.soup = BeautifulSoup(self.template, 'html.parser')
         
         self.hf_api_key = "HUGGING_FACE_TOKEN"
-        self.hf_api_url = "https://api-inference.huggingface.co/models/stabilityai/stable-diffusion-2"
+        self.hf_api_url = "https://api-inference.huggingface.co/models/black-forest-labs/FLUX.1-schnell"
 
     def process_pdf(self, content):
+        """
+        As discussed in RAG Theory, first split the document into chunks. Then use the embedding function
+        from langchain_huggingface (allMiniLML6v2) to convert each chunk into embeddings (list of numbers)
+        where each number in the list has some semantic or relation with the language/meaning.
+        """
         print('Processing PDF...')
         texts = RecursiveCharacterTextSplitter(
-            chunk_size=1000,
-            chunk_overlap=200
+            chunk_size=1000,                    # each chunk is 1000 characters in length
+            chunk_overlap=200                   # mix in 200 chars from previous chunk in the current chunk to keep relevance
         ).split_text(content)
         
-        return Chroma.from_texts(
+        return Chroma.from_texts(               # returns a vectorstore     
             texts=texts,
             embedding=self.embeddings,
             persist_directory="./chroma_db"
         )
 
     def generate_sections(self, vectorstore):
-        # Get context for titles
+        """
+        First use RAG to find out what the entire PDF is about and the different topics present in it.
+        Parse the titles/topics with the structured output we made using Pydantic
+        Then for each title:
+            Use RAG with the title as query to get relevant content and rephrase/analyze using the LLMs
+            to generate `content` for each title
+        Finally combine them into a Section object with both title and content.
+
+        This method reduces the token usage from LLMs by splitting the work into multiple (5) prompts instead of a single prompt.
+        """
         context = " ".join([doc.page_content for doc in vectorstore.similarity_search(
             "Extract main topics for blog sections",
             k=3
@@ -96,6 +120,10 @@ class BlogGenerator:
         return sections
 
     def generate_image(self, prompt):
+        """
+        Generating images via the HuggingFace endpoint for Flux1.Schnell
+        In the return statement we use base64 to encode it
+        """
         print('Generating image...')
         response = requests.post(
             self.hf_api_url,
@@ -105,9 +133,13 @@ class BlogGenerator:
                 "parameters": {"width": 768, "height": 512}
             }
         )
+        print(response)
         return base64.b64encode(response.content).decode()
 
     def generate_blog(self, title, tags, description, supporting_content):
+        """
+        We are using beautiful soup to inject the generated content into the respective HTML Positions
+        """
         print('Generating blog...')
         
         # Update header
